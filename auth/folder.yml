@@ -1,0 +1,11 @@
+info:
+  name: AUTH - Authentication & Role-Based Access Control
+  type: folder
+  seq: 1
+docs:
+  content: |-
+    Module ID: AUTH
+    Domain: Authentication & Role-Based Access Control
+    Target Spec: specs/swagger.json
+    Product Spec: specs/TECH_SPEC.md
+  type: text/markdown

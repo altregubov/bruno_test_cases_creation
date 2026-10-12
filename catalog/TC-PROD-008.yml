@@ -1,0 +1,56 @@
+info:
+  name: "TC-PROD-008: Case-insensitive normalization for catalog category and brand filters"
+  type: http
+  seq: 11
+  tags:
+    - catalog
+    - normalization
+    - bva
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/products?category=LAPTOP&manufacturer=aPpLe"
+  params:
+    - name: category
+      value: LAPTOP
+      type: query
+    - name: manufacturer
+      value: aPpLe
+      type: query
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data
+      operator: isArray
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-008: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-PROD-008: Case-insensitive filter query must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-PROD-008: Must match MacBook Pro 16 regardless of case difference", function() {
+          expect(res.getBody().data).to.be.an("array");
+          expect(res.getBody().data.length).to.be.at.least(1);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

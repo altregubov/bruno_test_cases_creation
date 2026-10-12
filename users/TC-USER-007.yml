@@ -1,0 +1,59 @@
+info:
+  name: "TC-USER-007: Admin queries paginated user directory with role filtering"
+  type: http
+  seq: 10
+  tags:
+    - users
+    - admin
+    - pagination
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/users?role=user&page=1&page_size=10"
+  params:
+    - name: role
+      value: user
+      type: query
+    - name: page
+      value: "1"
+      type: query
+    - name: page_size
+      value: "10"
+      type: query
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data
+      operator: isArray
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-007: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-USER-007: User list fetch must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-USER-007: Must return at least one user", function() {
+          expect(res.getBody().data).to.be.an("array");
+          expect(res.getBody().data.length).to.be.greaterThan(0);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

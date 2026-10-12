@@ -1,0 +1,85 @@
+info:
+  name: "TC-PROD-001: Admin registers a new commercial product in the warehouse catalog"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - catalog
+    - admin
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/products"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "category": "monitor",
+        "manufacturer": "Dell",
+        "model": "UltraSharp 27 U2724D",
+        "price": 450.00,
+        "stock_quantity": 25
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.id
+        method: jsonq
+      variable:
+        name: created_product_id
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.category
+      operator: eq
+      value: monitor
+    - expression: res.body.data.price
+      operator: eq
+      value: "450"
+    - expression: res.body.data.stock_quantity
+      operator: eq
+      value: "25"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-001: HTTP status is 201 Created", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("TC-PROD-001: Response success must be true", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-PROD-001: Category must match created payload", function() {
+          expect(res.getBody().data.category).to.equal("monitor");
+        });
+
+        test("TC-PROD-001: Price must match requested price", function() {
+          expect(res.getBody().data.price).to.equal(450.00);
+        });
+
+        test("TC-PROD-001: Initial stock quantity must be 25", function() {
+          expect(res.getBody().data.stock_quantity).to.equal(25);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

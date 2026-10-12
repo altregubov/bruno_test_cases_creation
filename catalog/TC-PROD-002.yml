@@ -1,0 +1,58 @@
+info:
+  name: "TC-PROD-002: Admin updates warehouse inventory stock level"
+  type: http
+  seq: 2
+  tags:
+    - smoke
+    - inventory
+    - admin
+    - p0
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/products/{{seeded_macbook_id}}/stock"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "stock_quantity": 50
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.stock_quantity
+      operator: eq
+      value: "50"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-002: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-PROD-002: Stock update must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-PROD-002: Stock quantity must be updated to 50", function() {
+          expect(res.getBody().data.stock_quantity).to.equal(50);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,71 @@
+info:
+  name: "TC-USER-009 (Step 3): Verify deleted user cannot be fetched"
+  type: http
+  seq: 15
+  tags:
+    - users
+    - admin
+    - lifecycle
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/users/{{temp_user_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+    - expression: res.body.error.code
+      operator: eq
+      value: NOT_FOUND
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("temp_user_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const authHeaders = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("admin_token")}`
+          };
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: authHeaders,
+            data: {
+              username: "to_delete_" + bru.interpolate("{{$guid}}"),
+              password: "password123",
+              role: "user",
+              balance: 0.00,
+              allowed_categories: [],
+              allowed_manufacturers: []
+            }
+          });
+          if (createRes && createRes.data && createRes.data.data && createRes.data.data.id) {
+            const tempId = createRes.data.data.id;
+            bru.setVar("temp_user_id", tempId);
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${tempId}`,
+              headers: authHeaders
+            });
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-009 (Step 3): Deleted user returns HTTP 404 NOT_FOUND", function() {
+          expect(res.getStatus()).to.equal(404);
+          expect(res.getBody().error.code).to.equal("NOT_FOUND");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

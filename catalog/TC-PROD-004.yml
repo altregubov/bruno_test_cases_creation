@@ -1,0 +1,48 @@
+info:
+  name: "TC-PROD-004: Admin retrieves unrestricted warehouse catalog inventory"
+  type: http
+  seq: 5
+  tags:
+    - catalog
+    - admin
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/products"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data
+      operator: isArray
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-004: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-PROD-004: Catalog query must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-PROD-004: All catalog items visible to administrator (at least 5)", function() {
+          expect(res.getBody().data).to.be.an("array");
+          expect(res.getBody().data.length).to.be.at.least(5);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

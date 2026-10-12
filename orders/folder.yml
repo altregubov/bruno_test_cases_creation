@@ -1,0 +1,11 @@
+info:
+  name: ORD - Transactional Orders & Lifecycle Orchestration
+  type: folder
+  seq: 4
+docs:
+  content: |-
+    Module ID: ORD
+    Domain: Transactional Orders & Lifecycle Orchestration
+    Target Spec: specs/swagger.json
+    Product Spec: specs/TECH_SPEC.md
+  type: text/markdown

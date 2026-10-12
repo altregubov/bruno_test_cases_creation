@@ -1,0 +1,50 @@
+info:
+  name: "TC-USER-008b: Admin gets user by ID - reject non-existent UUID (404 NOT_FOUND)"
+  type: http
+  seq: 12
+  tags:
+    - users
+    - admin
+    - bva
+    - negative
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/users/00000000-0000-0000-0000-000000000099"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: NOT_FOUND
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-008b: HTTP status is 404 Not Found", function() {
+          expect(res.getStatus()).to.equal(404);
+        });
+
+        test("TC-USER-008b: Response success must be false", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+        test("TC-USER-008b: Error code must match NOT_FOUND", function() {
+          expect(res.getBody().error.code).to.equal("NOT_FOUND");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

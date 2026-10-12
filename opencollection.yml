@@ -1,0 +1,168 @@
+opencollection: 1.0.0
+info:
+  name: Warehouse REST API Test Suite
+  version: 1.0.0
+  summary: Executable OpenCollection YAML test suite for Warehouse REST API (AUTH, USER, PROD, ORD)
+request:
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  variables:
+    - name: base_url
+      value: http://localhost:8080
+    - name: admin_username
+      value: admin
+    - name: admin_password
+      value: admin123
+    - name: user_a_username
+      value: userA
+    - name: user_a_password
+      value: user123
+    - name: user_b_username
+      value: userB
+    - name: user_b_password
+      value: user123
+    - name: user_c_username
+      value: userC
+    - name: user_c_password
+      value: user123
+    - name: user_a_id
+      value: b0000000-0000-0000-0000-000000000002
+    - name: user_b_id
+      value: b0000000-0000-0000-0000-000000000003
+    - name: user_c_id
+      value: b0000000-0000-0000-0000-000000000004
+    - name: seeded_macbook_id
+      value: c0000000-0000-0000-0000-000000000001
+    - name: seeded_dell_laptop_id
+      value: c0000000-0000-0000-0000-000000000002
+    - name: seeded_iphone_id
+      value: c0000000-0000-0000-0000-000000000003
+  scripts:
+    - type: before-request
+      code: |-
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        const adminPassword = bru.getProcessEnv("ADMIN_PASSWORD") || bru.getEnvVar("admin_password") || bru.getCollectionVar("admin_password") || "admin123";
+        const userAPassword = bru.getProcessEnv("USER_A_PASSWORD") || bru.getEnvVar("user_a_password") || bru.getCollectionVar("user_a_password") || "user123";
+        const userBPassword = bru.getProcessEnv("USER_B_PASSWORD") || bru.getEnvVar("user_b_password") || bru.getCollectionVar("user_b_password") || "user123";
+        const userCPassword = bru.getProcessEnv("USER_C_PASSWORD") || bru.getEnvVar("user_c_password") || bru.getCollectionVar("user_c_password") || "user123";
+
+        bru.setVar("resolved_admin_password", adminPassword);
+        bru.setVar("resolved_user_a_password", userAPassword);
+
+        if (!bru.getVar("fixtures_initialized")) {
+          const jsonHeaders = { "Content-Type": "application/json", "Accept": "application/json" };
+
+          const adminRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/login`,
+            headers: jsonHeaders,
+            data: { username: "admin", password: adminPassword }
+          });
+          if (adminRes && adminRes.data && adminRes.data.data && adminRes.data.data.token) {
+            const adminToken = adminRes.data.data.token;
+            bru.setVar("admin_token", adminToken);
+            bru.setVar("admin_jwt", adminToken);
+
+            const authHeaders = { ...jsonHeaders, "Authorization": `Bearer ${adminToken}` };
+            const userAId = bru.getEnvVar("user_a_id") || bru.getCollectionVar("user_a_id") || "b0000000-0000-0000-0000-000000000002";
+            const userBId = bru.getEnvVar("user_b_id") || bru.getCollectionVar("user_b_id") || "b0000000-0000-0000-0000-000000000003";
+            const userCId = bru.getEnvVar("user_c_id") || bru.getCollectionVar("user_c_id") || "b0000000-0000-0000-0000-000000000004";
+            const macbookId = bru.getEnvVar("seeded_macbook_id") || bru.getCollectionVar("seeded_macbook_id") || "c0000000-0000-0000-0000-000000000001";
+            const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+
+            // Ensure seeded user filters and product stock preconditions
+            await bru.sendRequest({
+              method: "PUT",
+              url: `${baseUrl}/api/admin/users/${userAId}/filters`,
+              headers: authHeaders,
+              data: { allowed_categories: [], allowed_manufacturers: [] }
+            });
+            await bru.sendRequest({
+              method: "PUT",
+              url: `${baseUrl}/api/admin/users/${userBId}/filters`,
+              headers: authHeaders,
+              data: { allowed_categories: ["laptop"], allowed_manufacturers: [] }
+            });
+            await bru.sendRequest({
+              method: "PUT",
+              url: `${baseUrl}/api/admin/users/${userCId}/filters`,
+              headers: authHeaders,
+              data: { allowed_categories: [], allowed_manufacturers: ["Apple"] }
+            });
+            await bru.sendRequest({
+              method: "PATCH",
+              url: `${baseUrl}/api/admin/products/${macbookId}/stock`,
+              headers: authHeaders,
+              data: { stock_quantity: 15 }
+            });
+            await bru.sendRequest({
+              method: "PATCH",
+              url: `${baseUrl}/api/admin/products/${dellId}/stock`,
+              headers: authHeaders,
+              data: { stock_quantity: 20 }
+            });
+          }
+
+          const userARes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: jsonHeaders,
+            data: { username: "userA", password: userAPassword }
+          });
+          if (userARes && userARes.data && userARes.data.data && userARes.data.data.token) {
+            bru.setVar("user_token", userARes.data.data.token);
+            bru.setVar("user_jwt", userARes.data.data.token);
+            if (userARes.data.data.user && userARes.data.data.user.id) {
+              bru.setVar("user_a_id", userARes.data.data.user.id);
+              bru.setVar("user_id", userARes.data.data.user.id);
+            }
+            if (userARes.data.data.user && userARes.data.data.user.balance < 5000 && bru.getVar("admin_token")) {
+              await bru.sendRequest({
+                method: "POST",
+                url: `${baseUrl}/api/admin/users/${userARes.data.data.user.id}/balance/top-up`,
+                headers: { ...jsonHeaders, "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+                data: { increment_amount: 5000.00 }
+              });
+            }
+          }
+
+          const userBRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: jsonHeaders,
+            data: { username: "userB", password: userBPassword }
+          });
+          if (userBRes && userBRes.data && userBRes.data.data && userBRes.data.data.token) {
+            bru.setVar("user_b_token", userBRes.data.data.token);
+          }
+
+          const userCRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: jsonHeaders,
+            data: { username: "userC", password: userCPassword }
+          });
+          if (userCRes && userCRes.data && userCRes.data.data && userCRes.data.data.token) {
+            bru.setVar("user_c_token", userCRes.data.data.token);
+          }
+
+          bru.setVar("fixtures_initialized", true);
+        }
+extensions:
+  bruno:
+    presets:
+      defaultEnvironment: local
+      request:
+        type: http
+        url: "{{base_url}}/api"
+docs: |-
+  # Warehouse REST API Test Suite (OpenCollection YAML)
+
+  Comprehensive API test cases converted from `/home/lex/development/test_case_creation/specs/test_cases/`:
+  - **AUTH** (`auth/`): Authentication & Role-Based Access Control (`TC-AUTH-001` – `TC-AUTH-006`)
+  - **USER** (`users/`): User Governance & Account Lifecycle (`TC-USER-001` – `TC-USER-010`)
+  - **PROD** (`catalog/`): Product Catalog & Warehouse Inventory Management (`TC-PROD-001` – `TC-PROD-010`)
+  - **ORD** (`orders/`): Transactional Orders & Lifecycle Orchestration (`TC-ORD-001` – `TC-ORD-010`)

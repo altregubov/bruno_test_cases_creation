@@ -1,0 +1,49 @@
+info:
+  name: "TC-AUTH-006a: Reject login request with empty username"
+  type: http
+  seq: 8
+  tags:
+    - auth
+    - validation
+    - negative
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "",
+        "password": "password123"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-AUTH-006a: HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-AUTH-006a: Response success must be false for empty credentials", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

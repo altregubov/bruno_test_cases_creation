@@ -1,0 +1,61 @@
+info:
+  name: "TC-PROD-009d: Validate pagination query parameter boundaries (unknown sort_by column rejected)"
+  type: http
+  seq: 15
+  tags:
+    - catalog
+    - pagination
+    - bva
+    - negative
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/products?page=1&page_size=20&sort_by=unknown_col&order=asc"
+  params:
+    - name: page
+      value: "1"
+      type: query
+    - name: page_size
+      value: "20"
+      type: query
+    - name: sort_by
+      value: unknown_col
+      type: query
+    - name: order
+      value: asc
+      type: query
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_INPUT
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-009d: HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-PROD-009d: Response success must be false and error code INVALID_INPUT", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("INVALID_INPUT");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

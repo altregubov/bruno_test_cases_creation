@@ -1,0 +1,63 @@
+info:
+  name: "TC-USER-003: Admin tops up user purchasing balance with positive increment"
+  type: http
+  seq: 3
+  tags:
+    - smoke
+    - users
+    - finance
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users/{{user_a_id}}/balance/top-up"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "increment_amount": 500.25
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.balance
+      operator: gte
+      value: "500.25"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-003: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-USER-003: Response success must be true", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-USER-003: Returned user ID must match target user", function() {
+          const targetId = bru.getVar("user_a_id") || bru.getEnvVar("user_a_id") || bru.getCollectionVar("user_a_id");
+          expect(res.getBody().data.id).to.equal(targetId);
+        });
+
+        test("TC-USER-003: Updated balance must reflect credited increment", function() {
+          expect(res.getBody().data.balance).to.be.at.least(500.25);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

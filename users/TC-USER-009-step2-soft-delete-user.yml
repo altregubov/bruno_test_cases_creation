@@ -1,0 +1,67 @@
+info:
+  name: "TC-USER-009 (Step 2): Execute soft-deletion on user account"
+  type: http
+  seq: 14
+  tags:
+    - users
+    - admin
+    - lifecycle
+
+http:
+  method: DELETE
+  url: "{{base_url}}/api/admin/users/{{temp_user_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("temp_user_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("admin_token")}`
+            },
+            data: {
+              username: "to_delete_" + bru.interpolate("{{$guid}}"),
+              password: "password123",
+              role: "user",
+              balance: 0.00,
+              allowed_categories: [],
+              allowed_manufacturers: []
+            }
+          });
+          if (createRes && createRes.data && createRes.data.data && createRes.data.data.id) {
+            bru.setVar("temp_user_id", createRes.data.data.id);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-009 (Step 2): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-USER-009 (Step 2): Deactivation must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

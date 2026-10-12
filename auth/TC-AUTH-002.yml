@@ -1,0 +1,96 @@
+info:
+  name: "TC-AUTH-002: Standard customer authenticates successfully with valid credentials"
+  type: http
+  seq: 2
+  tags:
+    - smoke
+    - auth
+    - customer
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "userA",
+        "password": "{{resolved_user_a_password}}"
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: user_jwt
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: user_token
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.user.id
+        method: jsonq
+      variable:
+        name: user_id
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.user.role
+      operator: eq
+      value: user
+    - expression: res.body.data.user.username
+      operator: eq
+      value: userA
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-AUTH-002: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-AUTH-002: Response success must be true", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-AUTH-002: Authenticated user role must be 'user'", function() {
+          expect(res.getBody().data.user.role).to.equal("user");
+        });
+
+        test("TC-AUTH-002: Username must match userA", function() {
+          expect(res.getBody().data.user.username).to.equal("userA");
+        });
+
+        test("TC-AUTH-002: Response schema contains token and user ID", function() {
+          const body = res.getBody();
+          expect(body.data.token).to.be.a("string").and.not.be.empty;
+          expect(body.data.user.id).to.be.a("string").and.not.be.empty;
+          expect(body.requestId).to.be.a("string").and.not.be.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

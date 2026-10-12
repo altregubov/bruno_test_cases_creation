@@ -1,0 +1,64 @@
+info:
+  name: "TC-USER-006: Authenticated customer retrieves own profile and active filters"
+  type: http
+  seq: 9
+  tags:
+    - smoke
+    - users
+    - profile
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/profile"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.username
+      operator: eq
+      value: userA
+    - expression: res.body.data.role
+      operator: eq
+      value: user
+    - expression: res.body.data.balance
+      operator: isDefined
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-006: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-USER-006: Profile fetch must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-USER-006: Username must match authenticated user", function() {
+          expect(res.getBody().data.username).to.equal("userA");
+        });
+
+        test("TC-USER-006: Role must be 'user'", function() {
+          expect(res.getBody().data.role).to.equal("user");
+        });
+
+        test("TC-USER-006: Balance must be present", function() {
+          expect(res.getBody().data.balance).to.not.be.null;
+          expect(res.getBody().data.balance).to.be.a("number");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,62 @@
+info:
+  name: "TC-AUTH-005b: Login rejection on invalid credentials (nonexistent username)"
+  type: http
+  seq: 6
+  tags:
+    - auth
+    - security
+    - bva
+    - negative
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "nonexistent_user_9999",
+        "password": "somepassword"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_CREDENTIALS
+    - expression: res.body.error.message
+      operator: contains
+      value: Invalid username or password
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-AUTH-005b: HTTP status is 401 Unauthorized", function() {
+          expect(res.getStatus()).to.equal(401);
+        });
+
+        test("TC-AUTH-005b: Response success must be false", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+        test("TC-AUTH-005b: Must return uniform INVALID_CREDENTIALS without disclosing account existence", function() {
+          const body = res.getBody();
+          expect(body.error.code).to.equal("INVALID_CREDENTIALS");
+          expect(body.error.message).to.include("Invalid username or password");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

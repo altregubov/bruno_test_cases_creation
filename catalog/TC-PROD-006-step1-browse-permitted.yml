@@ -1,0 +1,51 @@
+info:
+  name: "TC-PROD-006 (Step 1): Query catalog without filter parameters as category-restricted user"
+  type: http
+  seq: 7
+  tags:
+    - catalog
+    - whitelist
+    - security
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/products"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_b_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-006 (Step 1): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-PROD-006 (Step 1): Catalog browse must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-PROD-006 (Step 1): All returned products must strictly belong to permitted 'laptop' category", function() {
+          const items = res.getBody().data;
+          expect(items).to.be.an("array").that.is.not.empty;
+          items.forEach(function(item) {
+            expect(item.category.toLowerCase()).to.equal("laptop");
+          });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

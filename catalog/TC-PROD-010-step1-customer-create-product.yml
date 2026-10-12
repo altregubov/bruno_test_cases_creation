@@ -1,0 +1,60 @@
+info:
+  name: "TC-PROD-010 (Step 1): RBAC enforcement blocks customer from creating products"
+  type: http
+  seq: 16
+  tags:
+    - catalog
+    - rbac
+    - security
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/products"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "category": "laptop",
+        "manufacturer": "HackerBrand",
+        "model": "ExploitModel",
+        "price": 1.00,
+        "stock_quantity": 100
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "403"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: FORBIDDEN
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-010 (Step 1): HTTP status is 403 Forbidden", function() {
+          expect(res.getStatus()).to.equal(403);
+        });
+
+        test("TC-PROD-010 (Step 1): Customer cannot create warehouse products", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("FORBIDDEN");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,73 @@
+info:
+  name: "TC-PROD-005: Customer browses catalog with pagination and deterministic sorting"
+  type: http
+  seq: 6
+  tags:
+    - smoke
+    - catalog
+    - customer
+    - pagination
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/products?page=1&page_size=10&sort_by=price&order=asc"
+  params:
+    - name: page
+      value: "1"
+      type: query
+    - name: page_size
+      value: "10"
+      type: query
+    - name: sort_by
+      value: price
+      type: query
+    - name: order
+      value: asc
+      type: query
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.pagination.page
+      operator: eq
+      value: "1"
+    - expression: res.body.pagination.page_size
+      operator: eq
+      value: "10"
+    - expression: res.body.pagination.total_count
+      operator: gte
+      value: "1"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-005: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-PROD-005: Catalog query must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-PROD-005: Pagination metadata matches page=1 and page_size=10", function() {
+          const pagination = res.getBody().pagination;
+          expect(pagination.page).to.equal(1);
+          expect(pagination.page_size).to.equal(10);
+          expect(pagination.total_count).to.be.at.least(1);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

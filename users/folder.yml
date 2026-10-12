@@ -1,0 +1,11 @@
+info:
+  name: USER - User Governance & Account Lifecycle
+  type: folder
+  seq: 2
+docs:
+  content: |-
+    Module ID: USER
+    Domain: User Governance & Account Lifecycle
+    Target Spec: specs/swagger.json
+    Product Spec: specs/TECH_SPEC.md
+  type: text/markdown

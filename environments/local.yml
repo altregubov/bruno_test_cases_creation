@@ -1,0 +1,47 @@
+name: local
+variables:
+  - name: base_url
+    value: http://localhost:8080
+    description: Base URL for Warehouse REST API service
+  - name: admin_username
+    value: admin
+    description: Default seeded administrator username
+  - name: admin_password
+    value: admin123
+    description: Default seeded administrator password
+  - name: user_a_username
+    value: userA
+    description: Unrestricted standard customer username
+  - name: user_a_password
+    value: user123
+    description: Unrestricted standard customer password
+  - name: user_b_username
+    value: userB
+    description: Category-restricted customer username (laptop only)
+  - name: user_b_password
+    value: user123
+    description: Category-restricted customer password
+  - name: user_c_username
+    value: userC
+    description: Manufacturer-restricted customer username (Apple only)
+  - name: user_c_password
+    value: user123
+    description: Manufacturer-restricted customer password
+  - name: user_a_id
+    value: b0000000-0000-0000-0000-000000000002
+    description: Seeded UUID for userA
+  - name: user_b_id
+    value: b0000000-0000-0000-0000-000000000003
+    description: Seeded UUID for userB
+  - name: user_c_id
+    value: b0000000-0000-0000-0000-000000000004
+    description: Seeded UUID for userC
+  - name: seeded_macbook_id
+    value: c0000000-0000-0000-0000-000000000001
+    description: Seeded UUID for Apple MacBook Pro 16 M3
+  - name: seeded_dell_laptop_id
+    value: c0000000-0000-0000-0000-000000000002
+    description: Seeded UUID for Dell XPS 15 9530
+  - name: seeded_iphone_id
+    value: c0000000-0000-0000-0000-000000000003
+    description: Seeded UUID for Apple iPhone 15 Pro Max

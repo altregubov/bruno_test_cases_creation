@@ -1,0 +1,45 @@
+info:
+  name: "TC-ORD-002 (Step 4): Verify order attempt was recorded in ledger with status FAILED"
+  type: http
+  seq: 7
+  tags:
+    - orders
+    - finance
+    - negative
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{broke_user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.data
+      operator: isArray
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-002 (Step 4): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-ORD-002 (Step 4): Failed order must be permanently recorded with status FAILED", function() {
+          const orders = res.getBody().data;
+          expect(orders).to.be.an("array");
+          expect(orders.length).to.be.at.least(1);
+          expect(orders[0].status).to.equal("FAILED");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,120 @@
+info:
+  name: "TC-ORD-009 (Step 1): Admin submits cancellation for PROCESSED order"
+  type: http
+  seq: 17
+  tags:
+    - smoke
+    - orders
+    - cancellation
+    - admin
+    - p0
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/orders/{{cancellable_order_id}}/status"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "status": "CANCELLED"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.status
+      operator: eq
+      value: CANCELLED
+  scripts:
+    - type: before-request
+      code: |-
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+
+        // 1. Capture customer balance before placing the order to be cancelled
+        const profBefore = await bru.sendRequest({
+          method: "GET",
+          url: `${baseUrl}/api/user/profile`,
+          headers: {
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("user_token")}`
+          }
+        });
+        if (profBefore && profBefore.data && profBefore.data.data) {
+          bru.setVar("tc_ord_009_pre_order_balance", profBefore.data.data.balance);
+        }
+
+        // 2. Capture warehouse product stock before placing the order to be cancelled
+        const prodBefore = await bru.sendRequest({
+          method: "GET",
+          url: `${baseUrl}/api/admin/products`,
+          headers: {
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("admin_token")}`
+          }
+        });
+        if (prodBefore && prodBefore.data && Array.isArray(prodBefore.data.data)) {
+          const dell = prodBefore.data.data.find((p) => p.id === dellId);
+          if (dell) {
+            bru.setVar("tc_ord_009_pre_order_stock", dell.stock_quantity);
+          }
+        }
+
+        // 3. Place a PROCESSED order for 2 units (debits balance and decrements stock)
+        const orderQty = 2;
+        const ordRes = await bru.sendRequest({
+          method: "POST",
+          url: `${baseUrl}/api/user/orders`,
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("user_token")}`
+          },
+          data: {
+            product_id: dellId,
+            quantity: orderQty
+          }
+        });
+        if (ordRes && ordRes.data && ordRes.data.data) {
+          const ordData = ordRes.data.data;
+          bru.setVar("cancellable_order_id", ordData.order_id);
+          bru.setVar("tc_ord_009_order_qty", ordData.quantity);
+          bru.setVar("tc_ord_009_order_total", ordData.total_price);
+          bru.setVar("tc_ord_009_post_order_balance", ordData.remaining_balance);
+          bru.setVar("tc_ord_009_post_order_stock", Number(bru.getVar("tc_ord_009_pre_order_stock")) - ordData.quantity);
+        }
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 200 && bru.getVar("cancellable_order_id")) {
+          bru.setVar("cancelled_order_id", bru.getVar("cancellable_order_id"));
+          bru.deleteVar("cancellable_order_id");
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-009 (Step 1): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-ORD-009 (Step 1): Order cancellation must succeed and transition status to CANCELLED", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(true);
+          expect(body.data.status).to.equal("CANCELLED");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

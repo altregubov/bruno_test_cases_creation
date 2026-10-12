@@ -1,0 +1,72 @@
+info:
+  name: "TC-ORD-006 (Step 2): Retrieve specific order by UUID"
+  type: http
+  seq: 14
+  tags:
+    - smoke
+    - orders
+    - audit
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/orders/{{first_order_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.product_model
+      operator: isDefined
+    - expression: res.body.data.unit_price
+      operator: isDefined
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("first_order_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const listRes = await bru.sendRequest({
+            method: "GET",
+            url: `${baseUrl}/api/user/orders`,
+            headers: {
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("user_token")}`
+            }
+          });
+          if (listRes && listRes.data && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+            const firstOrder = listRes.data.data[0];
+            bru.setVar("first_order_id", firstOrder.id || firstOrder.order_id);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-006 (Step 2): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-ORD-006 (Step 2): Order fetch must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-ORD-006 (Step 2): Order ID and snapshotted fields must match", function() {
+          const data = res.getBody().data;
+          const actualId = data.id || data.order_id;
+          expect(actualId).to.equal(bru.getVar("first_order_id"));
+          expect(data.product_model).to.not.be.null;
+          expect(data.unit_price).to.not.be.null;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,136 @@
+info:
+  name: "TC-ORD-001 (Step 3): Verify customer profile balance was atomically debited"
+  type: http
+  seq: 3
+  tags:
+    - smoke
+    - orders
+    - core
+    - transaction
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/profile"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: before-request
+      code: |-
+        if (bru.getVar("initial_balance") == null || bru.getVar("total_price") == null) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+          const prodBefore = await bru.sendRequest({
+            method: "GET",
+            url: `${baseUrl}/api/admin/products`,
+            headers: {
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("admin_token")}`
+            }
+          });
+          if (prodBefore && prodBefore.data && Array.isArray(prodBefore.data.data)) {
+            const dell = prodBefore.data.data.find((p) => p.id === dellId);
+            if (dell) {
+              bru.setVar("initial_stock", dell.stock_quantity);
+            }
+          }
+          const profRes = await bru.sendRequest({
+            method: "GET",
+            url: `${baseUrl}/api/user/profile`,
+            headers: {
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("user_token")}`
+            }
+          });
+          if (profRes && profRes.data && profRes.data.data) {
+            bru.setVar("initial_balance", profRes.data.data.balance);
+          }
+          const ordRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/orders`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("user_token")}`
+            },
+            data: {
+              product_id: dellId,
+              quantity: 2
+            }
+          });
+          if (ordRes && ordRes.data && ordRes.data.data) {
+            bru.setVar("order_id", ordRes.data.data.order_id);
+            bru.setVar("user_a_order_id", ordRes.data.data.order_id);
+            bru.setVar("unit_price", ordRes.data.data.unit_price);
+            bru.setVar("total_price", ordRes.data.data.total_price);
+          }
+        }
+    - type: after-response
+      code: |-
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+        const prodAfter = await bru.sendRequest({
+          method: "GET",
+          url: `${baseUrl}/api/admin/products`,
+          headers: {
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("admin_token")}`
+          }
+        });
+        if (prodAfter && prodAfter.data && Array.isArray(prodAfter.data.data)) {
+          const dell = prodAfter.data.data.find((p) => p.id === dellId);
+          if (dell) {
+            bru.setVar("post_order_stock", dell.stock_quantity);
+          }
+        }
+        const orderId = bru.getVar("order_id");
+        if (orderId) {
+          try {
+            await bru.sendRequest({
+              method: "PATCH",
+              url: `${baseUrl}/api/admin/orders/${orderId}/status`,
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": `Bearer ${bru.getVar("admin_token")}`
+              },
+              data: { status: "CANCELLED" }
+            });
+            bru.setVar("cancelled_order_id", orderId);
+          } catch (e) {
+            // ignore_errors: true
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-001 (Step 3): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-ORD-001 (Step 3): User balance must be reduced exactly by total price", function() {
+          const initialBalance = Number(bru.getVar("initial_balance"));
+          const totalPrice = Number(bru.getVar("total_price"));
+          const expectedBalance = Math.round((initialBalance - totalPrice) * 100) / 100;
+          expect(res.getBody().data.balance).to.equal(expectedBalance);
+        });
+
+        test("TC-ORD-001 (Step 3): Warehouse stock must be atomically decremented by ordered quantity (2)", function() {
+          const initialStock = Number(bru.getVar("initial_stock"));
+          const postOrderStock = Number(bru.getVar("post_order_stock"));
+          expect(postOrderStock).to.equal(initialStock - 2);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

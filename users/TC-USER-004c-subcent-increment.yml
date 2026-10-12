@@ -1,0 +1,58 @@
+info:
+  name: "TC-USER-004c: Validate boundary conditions on balance top-up (sub-cent increment rejected)"
+  type: http
+  seq: 6
+  tags:
+    - users
+    - finance
+    - bva
+    - negative
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users/{{user_a_id}}/balance/top-up"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "increment_amount": 0.005
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_INPUT
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-004c: HTTP status is 422 Unprocessable Entity", function() {
+          expect(res.getStatus()).to.equal(422);
+        });
+
+        test("TC-USER-004c: Response success must be false for invalid increment", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+        test("TC-USER-004c: Error code must match INVALID_INPUT", function() {
+          expect(res.getBody().error.code).to.equal("INVALID_INPUT");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

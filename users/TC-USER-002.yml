@@ -1,0 +1,67 @@
+info:
+  name: "TC-USER-002: Reject duplicate username registration with 409 Conflict"
+  type: http
+  seq: 2
+  tags:
+    - users
+    - conflict
+    - negative
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "userA",
+        "password": "password123",
+        "role": "user",
+        "balance": 500.00,
+        "allowed_categories": [],
+        "allowed_manufacturers": []
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "409"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: USERNAME_TAKEN
+    - expression: res.body.error.message
+      operator: contains
+      value: Username already exists
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-002: HTTP status is 409 Conflict", function() {
+          expect(res.getStatus()).to.equal(409);
+        });
+
+        test("TC-USER-002: Response success must be false", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+        test("TC-USER-002: Error code must be USERNAME_TAKEN", function() {
+          const body = res.getBody();
+          expect(body.error.code).to.equal("USERNAME_TAKEN");
+          expect(body.error.message).to.include("Username already exists");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

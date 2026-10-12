@@ -1,0 +1,90 @@
+info:
+  name: "TC-AUTH-001: Admin authenticates successfully with valid credentials"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - auth
+    - admin
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "admin",
+        "password": "{{resolved_admin_password}}"
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: admin_jwt
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: admin_token
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.user.role
+      operator: eq
+      value: admin
+    - expression: res.body.data.user.username
+      operator: eq
+      value: admin
+    - expression: res.body.requestId
+      operator: isDefined
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-AUTH-001: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-AUTH-001: Response success must be true", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-AUTH-001: Authenticated user role must be 'admin'", function() {
+          expect(res.getBody().data.user.role).to.equal("admin");
+        });
+
+        test("TC-AUTH-001: Username must match admin credentials", function() {
+          expect(res.getBody().data.user.username).to.equal("admin");
+        });
+
+        test("TC-AUTH-001: Response must contain correlation requestId and valid schema", function() {
+          const body = res.getBody();
+          expect(body.requestId).to.be.a("string").and.not.be.empty;
+          expect(body.data.token).to.be.a("string").and.not.be.empty;
+          expect(body.data.user.id).to.be.a("string").and.not.be.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

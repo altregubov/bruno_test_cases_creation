@@ -1,0 +1,66 @@
+info:
+  name: "TC-ORD-001 (Step 1): Capture customer balance before order placement"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - orders
+    - core
+    - transaction
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/profile"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.balance
+        method: jsonq
+      variable:
+        name: initial_balance
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: before-request
+      code: |-
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+        const prodRes = await bru.sendRequest({
+          method: "GET",
+          url: `${baseUrl}/api/admin/products`,
+          headers: {
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("admin_token")}`
+          }
+        });
+        if (prodRes && prodRes.data && Array.isArray(prodRes.data.data)) {
+          const dell = prodRes.data.data.find((p) => p.id === dellId);
+          if (dell) {
+            bru.setVar("initial_stock", dell.stock_quantity);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-001 (Step 1): HTTP status is 200 OK and initial balance & stock are captured", function() {
+          expect(res.getStatus()).to.equal(200);
+          expect(res.getBody().data.balance).to.be.a("number");
+          expect(bru.getVar("initial_stock")).to.be.a("number");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

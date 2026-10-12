@@ -1,0 +1,65 @@
+info:
+  name: "TC-ORD-007: Data isolation blocks customer from accessing orders placed by another account"
+  type: http
+  seq: 15
+  tags:
+    - orders
+    - security
+    - isolation
+    - negative
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/orders/{{user_a_order_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_b_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: NOT_FOUND
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("user_a_order_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const listRes = await bru.sendRequest({
+            method: "GET",
+            url: `${baseUrl}/api/user/orders`,
+            headers: {
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("user_token")}`
+            }
+          });
+          if (listRes && listRes.data && Array.isArray(listRes.data.data) && listRes.data.data.length > 0) {
+            const firstOrder = listRes.data.data[0];
+            bru.setVar("user_a_order_id", firstOrder.id || firstOrder.order_id);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-007: HTTP status is 404 Not Found", function() {
+          expect(res.getStatus()).to.equal(404);
+        });
+
+        test("TC-ORD-007: Cross-tenant access must be rejected with NOT_FOUND", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("NOT_FOUND");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,11 @@
+info:
+  name: PROD - Product Catalog & Warehouse Inventory Management
+  type: folder
+  seq: 3
+docs:
+  content: |-
+    Module ID: PROD
+    Domain: Product Catalog & Warehouse Inventory Management
+    Target Spec: specs/swagger.json
+    Product Spec: specs/TECH_SPEC.md
+  type: text/markdown

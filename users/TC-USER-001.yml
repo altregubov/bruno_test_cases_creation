@@ -1,0 +1,98 @@
+info:
+  name: "TC-USER-001: Admin creates a new commercial customer account"
+  type: http
+  seq: 1
+  tags:
+    - smoke
+    - users
+    - admin
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{tc_user_001_username}}",
+        "password": "SecurePassword123!",
+        "role": "user",
+        "balance": 1500.50,
+        "allowed_categories": ["laptop"],
+        "allowed_manufacturers": ["Apple", "Dell"]
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.role
+      operator: eq
+      value: user
+    - expression: res.body.data.balance
+      operator: eq
+      value: "1500.5"
+    - expression: res.body.data.password_hash
+      operator: isUndefined
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar("tc_user_001_username", "client_" + bru.interpolate("{{$guid}}"));
+    - type: after-response
+      code: |-
+        if (res.getBody() && res.getBody().data && res.getBody().data.id) {
+          const createdUserId = res.getBody().data.id;
+          bru.setVar("created_user_id", createdUserId);
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          try {
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${createdUserId}`,
+              headers: {
+                "Accept": "application/json",
+                "Authorization": `Bearer ${bru.getVar("admin_token")}`
+              }
+            });
+          } catch (e) {
+            // ignore_errors: true
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-001: HTTP status is 201 Created", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("TC-USER-001: Response success must be true", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-USER-001: Created user must have role 'user'", function() {
+          expect(res.getBody().data.role).to.equal("user");
+        });
+
+        test("TC-USER-001: Initial balance must match requested amount", function() {
+          expect(res.getBody().data.balance).to.equal(1500.50);
+        });
+
+        test("TC-USER-001: Password hash must not be leaked in response", function() {
+          expect(res.getBody().data.password_hash).to.be.undefined;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

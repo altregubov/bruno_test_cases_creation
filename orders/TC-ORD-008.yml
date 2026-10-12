@@ -1,0 +1,47 @@
+info:
+  name: "TC-ORD-008: Administrator audits all system orders across multiple customers"
+  type: http
+  seq: 16
+  tags:
+    - orders
+    - admin
+    - audit
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/orders"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data
+      operator: isArray
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-008: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-ORD-008: Admin order log retrieval must succeed with system-wide records", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(true);
+          expect(body.data).to.be.an("array");
+          expect(body.data.length).to.be.at.least(1);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

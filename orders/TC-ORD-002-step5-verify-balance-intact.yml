@@ -1,0 +1,61 @@
+info:
+  name: "TC-ORD-002 (Step 5): Verify customer balance remains intact ($10.00)"
+  type: http
+  seq: 8
+  tags:
+    - orders
+    - finance
+    - negative
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/profile"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{broke_user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.data.balance
+      operator: eq
+      value: "10"
+  scripts:
+    - type: after-response
+      code: |-
+        const brokeUserId = bru.getVar("broke_user_id");
+        if (brokeUserId) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          try {
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${brokeUserId}`,
+              headers: {
+                "Accept": "application/json",
+                "Authorization": `Bearer ${bru.getVar("admin_token")}`
+              }
+            });
+          } catch (e) {
+            // ignore_errors: true
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-002 (Step 5): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-ORD-002 (Step 5): Customer balance must not be debited on failed transaction", function() {
+          expect(res.getBody().data.balance).to.equal(10.00);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

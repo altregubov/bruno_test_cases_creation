@@ -1,0 +1,93 @@
+info:
+  name: "TC-ORD-009 (Step 2): Verify customer balance is refunded in exact cents after cancellation"
+  type: http
+  seq: 18
+  tags:
+    - smoke
+    - orders
+    - cancellation
+    - admin
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/profile"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+  scripts:
+    - type: before-request
+      code: |-
+        // Standalone guard if Step 2 is executed without Step 1
+        if (bru.getVar("tc_ord_009_pre_order_balance") == null) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+
+          const profBefore = await bru.sendRequest({
+            method: "GET",
+            url: `${baseUrl}/api/user/profile`,
+            headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("user_token")}` }
+          });
+          bru.setVar("tc_ord_009_pre_order_balance", profBefore.data.data.balance);
+
+          const prodBefore = await bru.sendRequest({
+            method: "GET",
+            url: `${baseUrl}/api/admin/products`,
+            headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+          });
+          const dell = prodBefore.data.data.find((p) => p.id === dellId);
+          bru.setVar("tc_ord_009_pre_order_stock", dell.stock_quantity);
+
+          const ordRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/orders`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("user_token")}` },
+            data: { product_id: dellId, quantity: 2 }
+          });
+          const ordData = ordRes.data.data;
+          bru.setVar("tc_ord_009_order_qty", ordData.quantity);
+          bru.setVar("tc_ord_009_order_total", ordData.total_price);
+          bru.setVar("tc_ord_009_post_order_balance", ordData.remaining_balance);
+          bru.setVar("tc_ord_009_post_order_stock", dell.stock_quantity - ordData.quantity);
+
+          await bru.sendRequest({
+            method: "PATCH",
+            url: `${baseUrl}/api/admin/orders/${ordData.order_id}/status`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+            data: { status: "CANCELLED" }
+          });
+          bru.setVar("cancelled_order_id", ordData.order_id);
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-009 (Step 2): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-ORD-009 (Step 2): Customer balance is refunded by exact order total_price after cancellation", function() {
+          const preOrderBalance = Number(bru.getVar("tc_ord_009_pre_order_balance"));
+          const postOrderBalance = Number(bru.getVar("tc_ord_009_post_order_balance"));
+          const orderTotal = Number(bru.getVar("tc_ord_009_order_total"));
+          const currentBalance = res.getBody().data.balance;
+
+          const expectedRefundedBalance = Math.round((postOrderBalance + orderTotal) * 100) / 100;
+          expect(currentBalance).to.equal(expectedRefundedBalance);
+          expect(currentBalance).to.equal(preOrderBalance);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

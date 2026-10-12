@@ -1,0 +1,121 @@
+info:
+  name: "TC-ORD-001 (Step 2): Submit purchase order for 2 units"
+  type: http
+  seq: 2
+  tags:
+    - smoke
+    - orders
+    - core
+    - transaction
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "product_id": "{{seeded_dell_laptop_id}}",
+        "quantity": 2
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.order_id
+        method: jsonq
+      variable:
+        name: order_id
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.unit_price
+        method: jsonq
+      variable:
+        name: unit_price
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.total_price
+        method: jsonq
+      variable:
+        name: total_price
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.order_id
+        method: jsonq
+      variable:
+        name: user_a_order_id
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.status
+      operator: eq
+      value: PROCESSED
+    - expression: res.body.data.quantity
+      operator: eq
+      value: "2"
+    - expression: res.body.data.remaining_balance
+      operator: isDefined
+  scripts:
+    - type: before-request
+      code: |-
+        if (bru.getVar("initial_balance") == null) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const profRes = await bru.sendRequest({
+            method: "GET",
+            url: `${baseUrl}/api/user/profile`,
+            headers: {
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("user_token")}`
+            }
+          });
+          if (profRes && profRes.data && profRes.data.data) {
+            bru.setVar("initial_balance", profRes.data.data.balance);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-001 (Step 2): HTTP status is 201 Created", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("TC-ORD-001 (Step 2): Order creation must succeed", function() {
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-ORD-001 (Step 2): Newly created valid order must have status PROCESSED", function() {
+          expect(res.getBody().data.status).to.equal("PROCESSED");
+        });
+
+        test("TC-ORD-001 (Step 2): Ordered quantity must be 2 and total_price == unit_price * 2", function() {
+          const data = res.getBody().data;
+          expect(data.quantity).to.equal(2);
+          expect(data.total_price).to.equal(data.unit_price * 2);
+          expect(data.remaining_balance).to.not.be.null;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

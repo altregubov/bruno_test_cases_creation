@@ -1,0 +1,80 @@
+info:
+  name: "TC-ORD-002 (Step 2): Authenticate as the low-balance user"
+  type: http
+  seq: 5
+  tags:
+    - orders
+    - finance
+    - negative
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{broke_username}}",
+        "password": "password123"
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: broke_user_token
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("broke_username")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "broke_user_" + bru.interpolate("{{$guid}}");
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("admin_token")}`
+            },
+            data: {
+              username: uname,
+              password: "password123",
+              role: "user",
+              balance: 10.00,
+              allowed_categories: [],
+              allowed_manufacturers: []
+            }
+          });
+          if (createRes && createRes.data && createRes.data.data) {
+            bru.setVar("broke_user_id", createRes.data.data.id);
+            bru.setVar("broke_username", createRes.data.data.username);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-002 (Step 2): Low-balance user authenticated with HTTP 200", function() {
+          expect(res.getStatus()).to.equal(200);
+          expect(res.getBody().data.token).to.be.a("string").and.not.be.empty;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

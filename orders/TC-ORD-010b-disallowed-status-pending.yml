@@ -1,0 +1,101 @@
+info:
+  name: "TC-ORD-010b: Strict rejection of disallowed lifecycle transition (PENDING rejected)"
+  type: http
+  seq: 21
+  tags:
+    - orders
+    - lifecycle
+    - negative
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/orders/{{cancellable_order_id}}/status"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "status": "PENDING"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_STATUS
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("cancellable_order_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+          const ordRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/orders`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("user_token")}`
+            },
+            data: {
+              product_id: dellId,
+              quantity: 1
+            }
+          });
+          if (ordRes && ordRes.data && ordRes.data.data) {
+            bru.setVar("cancellable_order_id", ordRes.data.data.order_id);
+          }
+        }
+    - type: after-response
+      code: |-
+        const orderId = bru.getVar("cancellable_order_id");
+        if (orderId) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          try {
+            await bru.sendRequest({
+              method: "PATCH",
+              url: `${baseUrl}/api/admin/orders/${orderId}/status`,
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": `Bearer ${bru.getVar("admin_token")}`
+              },
+              data: { status: "CANCELLED" }
+            });
+            if (!bru.getVar("cancelled_order_id")) {
+              bru.setVar("cancelled_order_id", orderId);
+            }
+            bru.deleteVar("cancellable_order_id");
+          } catch (e) {
+            // ignore cleanup errors
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-010b: HTTP status is 422 Unprocessable Entity", function() {
+          expect(res.getStatus()).to.equal(422);
+        });
+
+        test("TC-ORD-010b: Disallowed transition PENDING rejected with INVALID_STATUS", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("INVALID_STATUS");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

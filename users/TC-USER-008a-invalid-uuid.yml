@@ -1,0 +1,50 @@
+info:
+  name: "TC-USER-008a: Admin gets user by ID - reject invalid UUID format (400 INVALID_ID)"
+  type: http
+  seq: 11
+  tags:
+    - users
+    - admin
+    - bva
+    - negative
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/users/not-a-valid-uuid"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_ID
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-008a: HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-USER-008a: Response success must be false", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+        test("TC-USER-008a: Error code must match INVALID_ID", function() {
+          expect(res.getBody().error.code).to.equal("INVALID_ID");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

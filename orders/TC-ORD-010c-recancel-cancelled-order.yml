@@ -1,0 +1,88 @@
+info:
+  name: "TC-ORD-010c: Strict rejection of modification of terminal order (re-cancelling CANCELLED order)"
+  type: http
+  seq: 22
+  tags:
+    - orders
+    - lifecycle
+    - negative
+
+http:
+  method: PATCH
+  url: "{{base_url}}/api/admin/orders/{{cancelled_order_id}}/status"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "status": "CANCELLED"
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_STATUS
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("cancelled_order_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const dellId = bru.getEnvVar("seeded_dell_laptop_id") || bru.getCollectionVar("seeded_dell_laptop_id") || "c0000000-0000-0000-0000-000000000002";
+          const ordRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/orders`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("user_token")}`
+            },
+            data: {
+              product_id: dellId,
+              quantity: 1
+            }
+          });
+          if (ordRes && ordRes.data && ordRes.data.data) {
+            const ordId = ordRes.data.data.order_id;
+            await bru.sendRequest({
+              method: "PATCH",
+              url: `${baseUrl}/api/admin/orders/${ordId}/status`,
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": `Bearer ${bru.getVar("admin_token")}`
+              },
+              data: { status: "CANCELLED" }
+            });
+            bru.setVar("cancelled_order_id", ordId);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-010c: HTTP status is 422 Unprocessable Entity", function() {
+          expect(res.getStatus()).to.equal(422);
+        });
+
+        test("TC-ORD-010c: Cannot re-cancel already CANCELLED order (INVALID_STATUS)", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("INVALID_STATUS");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
