@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-014: Verify admin self-deletion guard or handling"
   type: http
-  seq: 27
+  seq: 29
   tags:
     - users
     - admin

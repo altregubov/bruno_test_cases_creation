@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-016b: Numeric boundary validation on balance top-up (sub-cent fractional 0.015 rejected)"
   type: http
-  seq: 30
+  seq: 32
   tags:
     - users
     - finance

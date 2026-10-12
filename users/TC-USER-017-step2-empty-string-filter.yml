@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-017 (Step 2): Attempt submitting blank string in category whitelist"
   type: http
-  seq: 32
+  seq: 34
   tags:
     - users
     - filters

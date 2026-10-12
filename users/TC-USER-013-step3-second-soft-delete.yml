@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-013 (Step 3): Execute second soft-deletion on same user ID"
   type: http
-  seq: 26
+  seq: 28
   tags:
     - users
     - lifecycle

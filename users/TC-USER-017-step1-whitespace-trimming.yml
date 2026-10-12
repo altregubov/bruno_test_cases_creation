@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-017 (Step 1): Configure whitelist filter with untrimmed whitespace values"
   type: http
-  seq: 31
+  seq: 33
   tags:
     - users
     - filters

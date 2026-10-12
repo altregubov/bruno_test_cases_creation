@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-012 (Step 3): Attempt re-creating user account with soft-deleted username"
   type: http
-  seq: 23
+  seq: 25
   tags:
     - users
     - conflict

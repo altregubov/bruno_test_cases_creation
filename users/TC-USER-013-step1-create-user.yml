@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-013 (Step 1): Create user for double deletion test"
   type: http
-  seq: 24
+  seq: 26
   tags:
     - users
     - lifecycle

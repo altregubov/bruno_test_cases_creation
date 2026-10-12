@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-016a: Numeric boundary validation on balance top-up (excessive overflow 1e18 rejected)"
   type: http
-  seq: 29
+  seq: 31
   tags:
     - users
     - finance

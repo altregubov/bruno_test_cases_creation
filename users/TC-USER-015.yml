@@ -1,7 +1,7 @@
 info:
   name: "TC-USER-015: Reject user registration with username exceeding VARCHAR(100) limit"
   type: http
-  seq: 28
+  seq: 30
   tags:
     - users
     - bva
