@@ -1,0 +1,70 @@
+info:
+  name: "TC-PROD-011 (Step 1): Create user with joint category and manufacturer restrictions"
+  type: http
+  seq: 18
+  tags:
+    - catalog
+    - whitelist
+    - intersection
+    - audit-f06
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{tc_prod_011_username}}",
+        "password": "password123",
+        "role": "user",
+        "balance": 1000.00,
+        "allowed_categories": ["laptop"],
+        "allowed_manufacturers": ["Apple"]
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.id
+        method: jsonq
+      variable:
+        name: intersect_user_id
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.username
+        method: jsonq
+      variable:
+        name: intersect_username
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar("tc_prod_011_username", "intersect_user_" + bru.interpolate("{{$guid}}"));
+    - type: tests
+      code: |-
+        test("TC-PROD-011 (Step 1): User created with HTTP 201", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

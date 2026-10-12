@@ -1,0 +1,53 @@
+info:
+  name: "TC-ORD-012 (Step 3): Login as exact cent test user"
+  type: http
+  seq: 26
+  tags:
+    - orders
+    - finance
+    - precision
+    - audit-f03
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{cent_username}}",
+        "password": "password123"
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: cent_user_token
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-012 (Step 3): Exact cent user logged in with HTTP 200", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

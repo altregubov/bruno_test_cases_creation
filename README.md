@@ -13,16 +13,16 @@ bruno_test_cases_creation/
 │   └── local.yml               # Local environment configuration (base_url, credentials, seeded UUIDs)
 ├── auth/                       # Module: AUTH (Authentication & Role-Based Access Control)
 │   ├── folder.yml
-│   └── TC-AUTH-001..006*.yml
+│   └── TC-AUTH-001..007*.yml
 ├── users/                      # Module: USER (User Governance & Account Lifecycle)
 │   ├── folder.yml
-│   └── TC-USER-001..010*.yml
+│   └── TC-USER-001..017*.yml
 ├── catalog/                    # Module: PROD (Product Catalog & Warehouse Inventory Management)
 │   ├── folder.yml
-│   └── TC-PROD-001..010*.yml
+│   └── TC-PROD-001..013*.yml
 └── orders/                     # Module: ORD (Transactional Orders & Lifecycle Orchestration)
     ├── folder.yml
-    └── TC-ORD-001..010*.yml
+    └── TC-ORD-001..015*.yml
 ```
 
 ---
@@ -31,11 +31,10 @@ bruno_test_cases_creation/
 
 | Module | Folder | Test Cases | Requests | Description |
 | --- | --- | --- | --- | --- |
-| **AUTH** | `auth/` | `TC-AUTH-001` – `TC-AUTH-006` | 9 | Admin & customer login, portal RBAC segregation, invalid credentials & constant-time dummy hash checks, empty credential validation |
-| **USER** | `users/` | `TC-USER-001` – `TC-USER-010` | 16 | Commercial user creation, `409 USERNAME_TAKEN`, balance top-up & boundary checks (`0`, negative, sub-cent), filter whitelists, customer profile, paginated directory, UUID validation, soft-deletion lifecycle, admin RBAC |
-| **PROD** | `catalog/` | `TC-PROD-001` – `TC-PROD-010` | 17 | Product registration, stock updates, negative price/stock validation, admin catalog, customer pagination & sorting, category (`userB`) and brand (`userC`) whitelist enforcement, case-insensitive filters, pagination boundaries, RBAC |
-| **ORD** | `orders/` | `TC-ORD-001` – `TC-ORD-010` | 22 | Atomic order checkout (balance debit & stock decrement), `INSUFFICIENT_FUNDS` & `FAILED` ledger recording, `INSUFFICIENT_STOCK`, `FILTER_RESTRICTION`, quantity boundaries, immutable order history snapshots, cross-tenant `NOT_FOUND` isolation, admin order audit, order cancellation with exact-cent balance refund & inventory restocking, terminal status transition rejections |
-
+| **AUTH** | `auth/` | `TC-AUTH-001` – `TC-AUTH-007` | 10 | Admin & customer login, portal RBAC segregation, invalid credentials & constant-time dummy hash checks, empty credential validation, bcrypt 72-byte password boundary (`audit-f09`) |
+| **USER** | `users/` | `TC-USER-001` – `TC-USER-017` | 32 | Commercial user creation, `409 USERNAME_TAKEN`, balance top-up & boundaries (`0`, negative, sub-cent, `1e18` overflow, `0.015` fractional), filter whitelists, whitespace trimming & empty string trap (`audit-f06`), customer profile, paginated directory, UUID validation, soft-deletion lifecycle, JWT revocation after soft-delete, username reuse prevention, double soft-delete, admin self-deletion guard (`audit-f04`), `VARCHAR(100)` username limit (`audit-f09`), admin RBAC |
+| **PROD** | `catalog/` | `TC-PROD-001` – `TC-PROD-013` | 25 | Product registration, stock updates, negative price/stock validation, admin catalog, customer pagination & sorting, category (`userB`), brand (`userC`), and AND-intersection (`audit-f06`) whitelist enforcement, case-insensitive filters, pagination boundaries, blank/oversized model & float overflow price boundaries (`audit-f03`, `audit-f09`), non-paginated envelope hygiene (`audit-f07`), RBAC |
+| **ORD** | `orders/` | `TC-ORD-001` – `TC-ORD-015` | 36 | Atomic order checkout (balance debit & stock decrement), `INSUFFICIENT_FUNDS` & `FAILED` ledger recording, `INSUFFICIENT_STOCK`, `FILTER_RESTRICTION`, quantity boundaries, immutable order history snapshots, cross-tenant `NOT_FOUND` isolation, admin order audit, order cancellation with exact-cent balance refund & inventory restocking, terminal status transition rejections, `NUMERIC(12,2)` overflow protection (`audit-f03`), exact-cent `$19.99 * 3 = $59.97` arithmetic precision, cancelling order of soft-deleted user (`audit-f04`), AND-intersection order blocking (`audit-f06`), multi-violation error precedence (`audit-f11`) |
 ---
 
 ## Prerequisites

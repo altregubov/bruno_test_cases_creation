@@ -1,0 +1,60 @@
+info:
+  name: "TC-USER-013 (Step 1): Create user for double deletion test"
+  type: http
+  seq: 24
+  tags:
+    - users
+    - lifecycle
+    - audit-f04
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{tc_user_013_username}}",
+        "password": "password123",
+        "role": "user",
+        "balance": 0.00,
+        "allowed_categories": [],
+        "allowed_manufacturers": []
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.id
+        method: jsonq
+      variable:
+        name: double_delete_id
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar("tc_user_013_username", "double_delete_" + bru.interpolate("{{$guid}}"));
+    - type: tests
+      code: |-
+        test("TC-USER-013 (Step 1): User created with HTTP 201", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

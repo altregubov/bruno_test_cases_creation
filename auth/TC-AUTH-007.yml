@@ -1,0 +1,60 @@
+info:
+  name: "TC-AUTH-007: Reject authentication attempts with passwords exceeding bcrypt 72-byte limit"
+  type: http
+  seq: 10
+  tags:
+    - auth
+    - security
+    - bva
+    - audit-f09
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "userA",
+        "password": "{{oversized_password}}"
+      }
+
+runtime:
+  variables:
+    - name: oversized_password
+      value: "A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8S9t0U1v2W3x4Y5z6A1b2C3d4E5f6G7h8I9j0K1l2M3n4_73chars"
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_INPUT
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-AUTH-007: HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-AUTH-007: Response success must be false", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+        test("TC-AUTH-007: Must return 400 Bad Request with INVALID_INPUT instead of internal server error 500", function() {
+          expect(res.getBody().error.code).to.equal("INVALID_INPUT");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

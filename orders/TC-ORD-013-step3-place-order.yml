@@ -1,0 +1,54 @@
+info:
+  name: "TC-ORD-013 (Step 3): Place valid order"
+  type: http
+  seq: 30
+  tags:
+    - orders
+    - lifecycle
+    - cancellation
+    - audit-f04
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{deact_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "product_id": "{{seeded_macbook_id}}",
+        "quantity": 1
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.order_id
+        method: jsonq
+      variable:
+        name: deact_order_id
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-013 (Step 3): Order placed with HTTP 201", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

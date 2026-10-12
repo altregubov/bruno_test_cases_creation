@@ -1,0 +1,52 @@
+info:
+  name: "TC-ORD-013 (Step 2): Login as user before placing order"
+  type: http
+  seq: 29
+  tags:
+    - orders
+    - lifecycle
+    - cancellation
+    - audit-f04
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{deact_username}}",
+        "password": "password123"
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: deact_token
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-013 (Step 2): User logged in with HTTP 200", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

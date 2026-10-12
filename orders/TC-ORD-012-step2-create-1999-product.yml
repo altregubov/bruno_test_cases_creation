@@ -1,0 +1,59 @@
+info:
+  name: "TC-ORD-012 (Step 2): Create item priced at $19.99"
+  type: http
+  seq: 25
+  tags:
+    - orders
+    - finance
+    - precision
+    - audit-f03
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/products"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "category": "accessory",
+        "manufacturer": "Anker",
+        "model": "USB-C Hub 19.99",
+        "price": 19.99,
+        "stock_quantity": 10
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.id
+        method: jsonq
+      variable:
+        name: cent_product_id
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-012 (Step 2): Product created at $19.99", function() {
+          expect(res.getStatus()).to.equal(201);
+          expect(res.getBody().data.price).to.equal(19.99);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

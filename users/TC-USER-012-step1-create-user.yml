@@ -1,0 +1,69 @@
+info:
+  name: "TC-USER-012 (Step 1): Create user account before soft-deletion and username reuse check"
+  type: http
+  seq: 21
+  tags:
+    - users
+    - conflict
+    - lifecycle
+    - audit-f04
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{tc_user_012_username}}",
+        "password": "password123",
+        "role": "user",
+        "balance": 50.00,
+        "allowed_categories": [],
+        "allowed_manufacturers": []
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.id
+        method: jsonq
+      variable:
+        name: reused_user_id
+        scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.username
+        method: jsonq
+      variable:
+        name: reused_user_name
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar("tc_user_012_username", "reused_user_" + bru.interpolate("{{$guid}}"));
+    - type: tests
+      code: |-
+        test("TC-USER-012 (Step 1): User created with HTTP 201", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

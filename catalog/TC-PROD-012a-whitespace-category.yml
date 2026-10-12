@@ -1,0 +1,60 @@
+info:
+  name: "TC-PROD-012a: Reject product creation with whitespace-only category"
+  type: http
+  seq: 21
+  tags:
+    - catalog
+    - bva
+    - audit-f09
+    - audit-f03
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/products"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "category": "   ",
+        "manufacturer": "Dell",
+        "model": "Inspiron 15",
+        "price": 499.00,
+        "stock_quantity": 10
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_INPUT
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-012a: HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-PROD-012a: Whitespace category rejected with INVALID_INPUT", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("INVALID_INPUT");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,92 @@
+info:
+  name: "TC-ORD-014 (Step 3): Attempt purchasing Dell XPS laptop (matches category 'laptop', fails brand 'Apple')"
+  type: http
+  seq: 35
+  tags:
+    - orders
+    - whitelist
+    - intersection
+    - audit-f06
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{joint_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "product_id": "{{seeded_dell_laptop_id}}",
+        "quantity": 1
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: FILTER_RESTRICTION
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("joint_token")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "joint_order_" + bru.interpolate("{{$guid}}");
+          const uRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+            data: { username: uname, password: "password123", role: "user", balance: 5000.00, allowed_categories: ["laptop"], allowed_manufacturers: ["Apple"] }
+          });
+          bru.setVar("joint_user_id", uRes.data.data.id);
+          bru.setVar("joint_username", uname);
+          const lRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            data: { username: uname, password: "password123" }
+          });
+          bru.setVar("joint_token", lRes.data.data.token);
+        }
+    - type: after-response
+      code: |-
+        const jointUserId = bru.getVar("joint_user_id");
+        if (jointUserId) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          try {
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${jointUserId}`,
+              headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+            });
+          } catch (e) {}
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-014 (Step 3): HTTP status is 422 Unprocessable Entity", function() {
+          expect(res.getStatus()).to.equal(422);
+        });
+
+        test("TC-ORD-014 (Step 3): Must be rejected with FILTER_RESTRICTION because Dell is not an allowed manufacturer", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("FILTER_RESTRICTION");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

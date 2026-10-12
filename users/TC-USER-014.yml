@@ -1,0 +1,91 @@
+info:
+  name: "TC-USER-014: Verify admin self-deletion guard or handling"
+  type: http
+  seq: 27
+  tags:
+    - users
+    - admin
+    - security
+    - audit-f04
+
+http:
+  method: DELETE
+  url: "{{base_url}}/api/admin/users/{{self_admin_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{self_admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+  scripts:
+    - type: before-request
+      code: |-
+        // Create an ephemeral admin and authenticate as that admin so self-deletion is tested
+        // without destroying the seeded primary 'admin' account if the server lacks a guard.
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        const uname = "self_del_admin_" + bru.interpolate("{{$guid}}");
+        const createRes = await bru.sendRequest({
+          method: "POST",
+          url: `${baseUrl}/api/admin/users`,
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("admin_token")}`
+          },
+          data: {
+            username: uname,
+            password: "adminPassword123",
+            role: "admin",
+            balance: 0.00,
+            allowed_categories: [],
+            allowed_manufacturers: []
+          }
+        });
+        if (createRes && createRes.data && createRes.data.data) {
+          bru.setVar("self_admin_id", createRes.data.data.id);
+          const loginRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/login`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            data: { username: uname, password: "adminPassword123" }
+          });
+          if (loginRes && loginRes.data && loginRes.data.data) {
+            bru.setVar("self_admin_token", loginRes.data.data.token);
+          }
+        }
+    - type: after-response
+      code: |-
+        const selfAdminId = bru.getVar("self_admin_id");
+        if (selfAdminId && res.getStatus() !== 200) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          try {
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${selfAdminId}`,
+              headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+            });
+          } catch (e) {}
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-014: HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-USER-014: Admin self-deletion must be safely rejected", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

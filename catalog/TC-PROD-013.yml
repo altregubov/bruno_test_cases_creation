@@ -1,0 +1,49 @@
+info:
+  name: "TC-PROD-013: Verify OpenAPI envelope hygiene: non-paginated endpoints do not leak pagination block"
+  type: http
+  seq: 25
+  tags:
+    - catalog
+    - schema
+    - audit-f07
+
+http:
+  method: GET
+  url: "{{base_url}}/api/admin/products"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data
+      operator: isDefined
+    - expression: res.body.pagination
+      operator: isUndefined
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-013: HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-PROD-013: Non-paginated endpoint must not leak pagination object in envelope", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(true);
+          expect(body.data).to.not.be.null;
+          expect(body.pagination).to.be.undefined;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

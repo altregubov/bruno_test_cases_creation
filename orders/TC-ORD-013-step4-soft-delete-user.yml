@@ -1,0 +1,36 @@
+info:
+  name: "TC-ORD-013 (Step 4): Admin soft-deletes customer account"
+  type: http
+  seq: 31
+  tags:
+    - orders
+    - lifecycle
+    - cancellation
+    - audit-f04
+
+http:
+  method: DELETE
+  url: "{{base_url}}/api/admin/users/{{deact_user_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-013 (Step 4): Customer account soft-deleted with HTTP 200", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

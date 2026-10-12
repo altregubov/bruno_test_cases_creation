@@ -1,0 +1,66 @@
+info:
+  name: "TC-USER-017 (Step 2): Attempt submitting blank string in category whitelist"
+  type: http
+  seq: 32
+  tags:
+    - users
+    - filters
+    - bva
+    - audit-f06
+
+http:
+  method: PUT
+  url: "{{base_url}}/api/admin/users/{{user_a_id}}/filters"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "allowed_categories": [""],
+        "allowed_manufacturers": ["Dell"]
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+  scripts:
+    - type: after-response
+      code: |-
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        const userAId = bru.getVar("user_a_id") || bru.getEnvVar("user_a_id") || "b0000000-0000-0000-0000-000000000002";
+        await bru.sendRequest({
+          method: "PUT",
+          url: `${baseUrl}/api/admin/users/${userAId}/filters`,
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": `Bearer ${bru.getVar("admin_token")}`
+          },
+          data: { allowed_categories: [], allowed_manufacturers: [] }
+        });
+    - type: tests
+      code: |-
+        test("TC-USER-017 (Step 2): HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-USER-017 (Step 2): Empty string in filter list must be rejected", function() {
+          expect(res.getBody().success).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

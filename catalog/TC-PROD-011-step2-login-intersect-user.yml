@@ -1,0 +1,80 @@
+info:
+  name: "TC-PROD-011 (Step 2): Login as intersection restricted user"
+  type: http
+  seq: 19
+  tags:
+    - catalog
+    - whitelist
+    - intersection
+    - audit-f06
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/login"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{intersect_username}}",
+        "password": "password123"
+      }
+
+runtime:
+  actions:
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.token
+        method: jsonq
+      variable:
+        name: intersect_token
+        scope: runtime
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("intersect_username")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "intersect_user_" + bru.interpolate("{{$guid}}");
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("admin_token")}`
+            },
+            data: {
+              username: uname,
+              password: "password123",
+              role: "user",
+              balance: 1000.00,
+              allowed_categories: ["laptop"],
+              allowed_manufacturers: ["Apple"]
+            }
+          });
+          if (createRes && createRes.data && createRes.data.data) {
+            bru.setVar("intersect_user_id", createRes.data.data.id);
+            bru.setVar("intersect_username", createRes.data.data.username);
+          }
+        }
+    - type: tests
+      code: |-
+        test("TC-PROD-011 (Step 2): Intersection user logged in with HTTP 200", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

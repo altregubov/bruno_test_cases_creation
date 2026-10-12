@@ -1,0 +1,55 @@
+info:
+  name: "TC-ORD-011: Numeric overflow protection during FAILED order ledger insertion"
+  type: http
+  seq: 23
+  tags:
+    - orders
+    - bva
+    - overflow
+    - audit-f03
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "product_id": "{{seeded_macbook_id}}",
+        "quantity": 10000000
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-011: HTTP status is 422 (or 400) without triggering database 500 numeric overflow", function() {
+          expect(res.getStatus()).to.equal(422);
+        });
+
+        test("TC-ORD-011: Must return semantic error code in ['INSUFFICIENT_STOCK', 'INSUFFICIENT_FUNDS', 'INVALID_INPUT']", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(["INSUFFICIENT_STOCK", "INSUFFICIENT_FUNDS", "INVALID_INPUT"]).to.include(body.error.code);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

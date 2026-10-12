@@ -1,0 +1,56 @@
+info:
+  name: "TC-ORD-015: Verify multi-violation error precedence order during checkout"
+  type: http
+  seq: 36
+  tags:
+    - orders
+    - precedence
+    - audit-f11
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{user_b_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "product_id": "{{seeded_iphone_id}}",
+        "quantity": 10
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "422"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: FILTER_RESTRICTION
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-ORD-015: HTTP status is 422 Unprocessable Entity", function() {
+          expect(res.getStatus()).to.equal(422);
+        });
+
+        test("TC-ORD-015: FILTER_RESTRICTION must take precedence over INSUFFICIENT_STOCK and INSUFFICIENT_FUNDS", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("FILTER_RESTRICTION");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

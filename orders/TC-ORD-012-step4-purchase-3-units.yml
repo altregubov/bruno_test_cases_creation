@@ -1,0 +1,103 @@
+info:
+  name: "TC-ORD-012 (Step 4): Purchase 3 units at $19.99 using entire balance of $59.97"
+  type: http
+  seq: 27
+  tags:
+    - orders
+    - finance
+    - precision
+    - audit-f03
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{cent_user_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "product_id": "{{cent_product_id}}",
+        "quantity": 3
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.data.total_price
+      operator: eq
+      value: "59.97"
+    - expression: res.body.data.remaining_balance
+      operator: eq
+      value: "0"
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("cent_user_token") || !bru.getVar("cent_product_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "exact_cent_" + bru.interpolate("{{$guid}}");
+          const uRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+            data: { username: uname, password: "password123", role: "user", balance: 59.97, allowed_categories: [], allowed_manufacturers: [] }
+          });
+          bru.setVar("cent_user_id", uRes.data.data.id);
+          bru.setVar("cent_username", uname);
+
+          const pRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/products`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+            data: { category: "accessory", manufacturer: "Anker", model: "USB-C Hub 19.99", price: 19.99, stock_quantity: 10 }
+          });
+          bru.setVar("cent_product_id", pRes.data.data.id);
+
+          const lRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            data: { username: uname, password: "password123" }
+          });
+          bru.setVar("cent_user_token", lRes.data.data.token);
+        }
+    - type: after-response
+      code: |-
+        const centUserId = bru.getVar("cent_user_id");
+        if (centUserId) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          try {
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${centUserId}`,
+              headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+            });
+          } catch (e) {}
+        }
+    - type: tests
+      code: |-
+        test("TC-ORD-012 (Step 4): HTTP status is 201 Created", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("TC-ORD-012 (Step 4): Total price must equal exact 59.97 without floating-point error", function() {
+          expect(res.getBody().data.total_price).to.equal(59.97);
+        });
+
+        test("TC-ORD-012 (Step 4): Remaining balance must be exactly 0.00, not 0.000000001 or negative", function() {
+          expect(res.getBody().data.remaining_balance).to.equal(0.00);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

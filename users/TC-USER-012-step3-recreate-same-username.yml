@@ -1,0 +1,92 @@
+info:
+  name: "TC-USER-012 (Step 3): Attempt re-creating user account with soft-deleted username"
+  type: http
+  seq: 23
+  tags:
+    - users
+    - conflict
+    - lifecycle
+    - audit-f04
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/users"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "username": "{{reused_user_name}}",
+        "password": "new_password123",
+        "role": "user",
+        "balance": 100.00,
+        "allowed_categories": [],
+        "allowed_manufacturers": []
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "409"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: USERNAME_TAKEN
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("reused_user_name")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "reused_user_" + bru.interpolate("{{$guid}}");
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("admin_token")}`
+            },
+            data: {
+              username: uname,
+              password: "password123",
+              role: "user",
+              balance: 50.00,
+              allowed_categories: [],
+              allowed_manufacturers: []
+            }
+          });
+          const uid = createRes.data.data.id;
+          bru.setVar("reused_user_id", uid);
+          bru.setVar("reused_user_name", uname);
+          await bru.sendRequest({
+            method: "DELETE",
+            url: `${baseUrl}/api/admin/users/${uid}`,
+            headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+          });
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-012 (Step 3): HTTP status is 409 Conflict", function() {
+          expect(res.getStatus()).to.equal(409);
+        });
+
+        test("TC-USER-012 (Step 3): Username collision must be prevented with USERNAME_TAKEN", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("USERNAME_TAKEN");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

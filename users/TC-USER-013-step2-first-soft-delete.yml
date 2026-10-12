@@ -1,0 +1,35 @@
+info:
+  name: "TC-USER-013 (Step 2): Execute first soft-deletion"
+  type: http
+  seq: 25
+  tags:
+    - users
+    - lifecycle
+    - audit-f04
+
+http:
+  method: DELETE
+  url: "{{base_url}}/api/admin/users/{{double_delete_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-USER-013 (Step 2): First soft-deletion succeeds with HTTP 200", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

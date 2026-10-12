@@ -1,0 +1,60 @@
+info:
+  name: "TC-PROD-012c: Reject product creation with model exceeding 150 characters"
+  type: http
+  seq: 23
+  tags:
+    - catalog
+    - bva
+    - audit-f09
+    - audit-f03
+
+http:
+  method: POST
+  url: "{{base_url}}/api/admin/products"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "category": "laptop",
+        "manufacturer": "Dell",
+        "model": "Model_x1y2z3a4b5c6d7e8f9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0_151chars",
+        "price": 499.00,
+        "stock_quantity": 10
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "400"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: INVALID_INPUT
+  scripts:
+    - type: tests
+      code: |-
+        test("TC-PROD-012c: HTTP status is 400 Bad Request", function() {
+          expect(res.getStatus()).to.equal(400);
+        });
+
+        test("TC-PROD-012c: Model exceeding 150 chars rejected with INVALID_INPUT", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("INVALID_INPUT");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,77 @@
+info:
+  name: "TC-USER-013 (Step 3): Execute second soft-deletion on same user ID"
+  type: http
+  seq: 26
+  tags:
+    - users
+    - lifecycle
+    - audit-f04
+
+http:
+  method: DELETE
+  url: "{{base_url}}/api/admin/users/{{double_delete_id}}"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{admin_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "404"
+    - expression: res.body.success
+      operator: eq
+      value: "false"
+    - expression: res.body.error.code
+      operator: eq
+      value: NOT_FOUND
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("double_delete_id")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "double_delete_" + bru.interpolate("{{$guid}}");
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("admin_token")}`
+            },
+            data: {
+              username: uname,
+              password: "password123",
+              role: "user",
+              balance: 0.00,
+              allowed_categories: [],
+              allowed_manufacturers: []
+            }
+          });
+          const uid = createRes.data.data.id;
+          bru.setVar("double_delete_id", uid);
+          await bru.sendRequest({
+            method: "DELETE",
+            url: `${baseUrl}/api/admin/users/${uid}`,
+            headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+          });
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-013 (Step 3): HTTP status is 404 Not Found", function() {
+          expect(res.getStatus()).to.equal(404);
+        });
+
+        test("TC-USER-013 (Step 3): Second delete call must return NOT_FOUND", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(false);
+          expect(body.error.code).to.equal("NOT_FOUND");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

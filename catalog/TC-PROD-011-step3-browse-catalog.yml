@@ -1,0 +1,107 @@
+info:
+  name: "TC-PROD-011 (Step 3): Browse warehouse catalog and verify AND whitelist intersection"
+  type: http
+  seq: 20
+  tags:
+    - catalog
+    - whitelist
+    - intersection
+    - audit-f06
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/products"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{intersect_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("intersect_token")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "intersect_user_" + bru.interpolate("{{$guid}}");
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+              "Authorization": `Bearer ${bru.getVar("admin_token")}`
+            },
+            data: {
+              username: uname,
+              password: "password123",
+              role: "user",
+              balance: 1000.00,
+              allowed_categories: ["laptop"],
+              allowed_manufacturers: ["Apple"]
+            }
+          });
+          if (createRes && createRes.data && createRes.data.data) {
+            bru.setVar("intersect_user_id", createRes.data.data.id);
+            bru.setVar("intersect_username", createRes.data.data.username);
+            const loginRes = await bru.sendRequest({
+              method: "POST",
+              url: `${baseUrl}/api/user/login`,
+              headers: { "Content-Type": "application/json", "Accept": "application/json" },
+              data: { username: uname, password: "password123" }
+            });
+            if (loginRes && loginRes.data && loginRes.data.data) {
+              bru.setVar("intersect_token", loginRes.data.data.token);
+            }
+          }
+        }
+    - type: after-response
+      code: |-
+        const intersectUserId = bru.getVar("intersect_user_id");
+        if (intersectUserId) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          try {
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${intersectUserId}`,
+              headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+            });
+          } catch (e) {}
+        }
+    - type: tests
+      code: |-
+        test("TC-PROD-011 (Step 3): HTTP status is 200 OK and success is true", function() {
+          expect(res.getStatus()).to.equal(200);
+          expect(res.getBody().success).to.equal(true);
+        });
+
+        test("TC-PROD-011 (Step 3): Products must satisfy BOTH category == 'laptop' AND manufacturer == 'Apple'", function() {
+          const items = res.getBody().data;
+          expect(items).to.be.an("array").that.is.not.empty;
+          items.forEach(function(p) {
+            expect(p.category.toLowerCase()).to.equal("laptop");
+            expect(p.manufacturer.toLowerCase()).to.equal("apple");
+          });
+        });
+
+        test("TC-PROD-011 (Step 3): Dell laptops and Apple smartphones must be excluded", function() {
+          const items = res.getBody().data;
+          const hasDell = items.some(function(p) { return p.manufacturer.toLowerCase() === "dell"; });
+          const hasSmartphone = items.some(function(p) { return p.category.toLowerCase() === "smartphone"; });
+          expect(hasDell).to.equal(false);
+          expect(hasSmartphone).to.equal(false);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
