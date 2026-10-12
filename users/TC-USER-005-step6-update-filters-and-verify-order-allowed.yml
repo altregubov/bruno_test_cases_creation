@@ -1,0 +1,109 @@
+info:
+  name: "TC-USER-005 (Step 6): Re-update filters to allow Dell and verify customer can immediately purchase Dell laptop"
+  type: http
+  seq: 8.4
+  tags:
+    - users
+    - filters
+    - orders
+    - p0
+
+http:
+  method: POST
+  url: "{{base_url}}/api/user/orders"
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{filter_user_token}}"
+  body:
+    type: json
+    data: |-
+      {
+        "product_id": "{{seeded_dell_laptop_id}}",
+        "quantity": 1
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "201"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.status
+      operator: eq
+      value: PROCESSED
+  scripts:
+    - type: before-request
+      code: |-
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        if (!bru.getVar("filter_user_token") || !bru.getVar("filter_user_id")) {
+          const uname = "filter_test_" + bru.interpolate("{{$guid}}");
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+            data: { username: uname, password: "password123", role: "user", balance: 5000.00, allowed_categories: [], allowed_manufacturers: [] }
+          });
+          const uid = createRes.data.data.id;
+          bru.setVar("filter_user_id", uid);
+          const loginRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            data: { username: uname, password: "password123" }
+          });
+          bru.setVar("filter_user_token", loginRes.data.data.token);
+        }
+
+        // Admin dynamically updates user's filters to allow Dell laptops
+        await bru.sendRequest({
+          method: "PUT",
+          url: `${baseUrl}/api/admin/users/${bru.getVar("filter_user_id")}/filters`,
+          headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+          data: { allowed_categories: ["laptop"], allowed_manufacturers: ["Dell"] }
+        });
+    - type: after-response
+      code: |-
+        const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+        if (res.getBody() && res.getBody().data && res.getBody().data.order_id) {
+          try {
+            await bru.sendRequest({
+              method: "PATCH",
+              url: `${baseUrl}/api/admin/orders/${res.getBody().data.order_id}/status`,
+              headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+              data: { status: "CANCELLED" }
+            });
+          } catch (e) {}
+        }
+        const filterUserId = bru.getVar("filter_user_id");
+        if (filterUserId) {
+          try {
+            await bru.sendRequest({
+              method: "DELETE",
+              url: `${baseUrl}/api/admin/users/${filterUserId}`,
+              headers: { "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` }
+            });
+          } catch (e) {}
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-005 (Step 6): HTTP status is 201 Created after filter update allows Dell", function() {
+          expect(res.getStatus()).to.equal(201);
+        });
+
+        test("TC-USER-005 (Step 6): Order succeeds with status PROCESSED once filter is updated", function() {
+          const body = res.getBody();
+          expect(body.success).to.equal(true);
+          expect(body.data.status).to.equal("PROCESSED");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

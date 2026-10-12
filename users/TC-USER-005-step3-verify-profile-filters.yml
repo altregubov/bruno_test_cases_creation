@@ -1,0 +1,80 @@
+info:
+  name: "TC-USER-005 (Step 3): Verify customer profile reflects updated whitelist filters"
+  type: http
+  seq: 8.1
+  tags:
+    - users
+    - filters
+    - profile
+    - p0
+
+http:
+  method: GET
+  url: "{{base_url}}/api/user/profile"
+  headers:
+    - name: Accept
+      value: application/json
+    - name: Authorization
+      value: "Bearer {{filter_user_token}}"
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.success
+      operator: eq
+      value: "true"
+    - expression: res.body.data.allowed_categories
+      operator: length
+      value: "2"
+    - expression: res.body.data.allowed_manufacturers
+      operator: length
+      value: "2"
+  scripts:
+    - type: before-request
+      code: |-
+        if (!bru.getVar("filter_user_token")) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "filter_test_" + bru.interpolate("{{$guid}}");
+          const createRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/admin/users`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+            data: { username: uname, password: "password123", role: "user", balance: 5000.00, allowed_categories: [], allowed_manufacturers: [] }
+          });
+          const uid = createRes.data.data.id;
+          bru.setVar("filter_user_id", uid);
+          await bru.sendRequest({
+            method: "PUT",
+            url: `${baseUrl}/api/admin/users/${uid}/filters`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json", "Authorization": `Bearer ${bru.getVar("admin_token")}` },
+            data: { allowed_categories: ["laptop", "smartphone"], allowed_manufacturers: ["Apple", "Samsung"] }
+          });
+          const loginRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            data: { username: uname, password: "password123" }
+          });
+          bru.setVar("filter_user_token", loginRes.data.data.token);
+        }
+    - type: tests
+      code: |-
+        test("TC-USER-005 (Step 3): HTTP status is 200 OK", function() {
+          expect(res.getStatus()).to.equal(200);
+        });
+
+        test("TC-USER-005 (Step 3): Customer profile reflects updated categories and manufacturers", function() {
+          const data = res.getBody().data;
+          const cats = data.allowed_categories.map(function(c) { return c.toLowerCase(); });
+          const mfgs = data.allowed_manufacturers.map(function(m) { return m.toLowerCase(); });
+          expect(cats).to.include.members(["laptop", "smartphone"]);
+          expect(mfgs).to.include.members(["apple", "samsung"]);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

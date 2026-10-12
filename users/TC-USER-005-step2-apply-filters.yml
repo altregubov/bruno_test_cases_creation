@@ -45,6 +45,7 @@ runtime:
       code: |-
         if (!bru.getVar("filter_user_id")) {
           const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const uname = "filter_test_" + bru.interpolate("{{$guid}}");
           const createRes = await bru.sendRequest({
             method: "POST",
             url: `${baseUrl}/api/admin/users`,
@@ -54,34 +55,26 @@ runtime:
               "Authorization": `Bearer ${bru.getVar("admin_token")}`
             },
             data: {
-              username: "filter_test_" + bru.interpolate("{{$guid}}"),
+              username: uname,
               password: "password123",
               role: "user",
-              balance: 1000.00,
+              balance: 5000.00,
               allowed_categories: [],
               allowed_manufacturers: []
             }
           });
           if (createRes && createRes.data && createRes.data.data && createRes.data.data.id) {
             bru.setVar("filter_user_id", createRes.data.data.id);
-          }
-        }
-    - type: after-response
-      code: |-
-        const filterUserId = bru.getVar("filter_user_id");
-        if (filterUserId) {
-          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
-          try {
-            await bru.sendRequest({
-              method: "DELETE",
-              url: `${baseUrl}/api/admin/users/${filterUserId}`,
-              headers: {
-                "Accept": "application/json",
-                "Authorization": `Bearer ${bru.getVar("admin_token")}`
-              }
+            bru.setVar("filter_user_name", uname);
+            const loginRes = await bru.sendRequest({
+              method: "POST",
+              url: `${baseUrl}/api/user/login`,
+              headers: { "Content-Type": "application/json", "Accept": "application/json" },
+              data: { username: uname, password: "password123" }
             });
-          } catch (e) {
-            // ignore_errors: true
+            if (loginRes && loginRes.data && loginRes.data.data) {
+              bru.setVar("filter_user_token", loginRes.data.data.token);
+            }
           }
         }
     - type: tests

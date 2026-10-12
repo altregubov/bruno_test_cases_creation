@@ -25,7 +25,7 @@ http:
         "username": "{{tc_user_005_username}}",
         "password": "password123",
         "role": "user",
-        "balance": 1000.00,
+        "balance": 5000.00,
         "allowed_categories": [],
         "allowed_manufacturers": []
       }
@@ -40,6 +40,14 @@ runtime:
       variable:
         name: filter_user_id
         scope: runtime
+    - type: set-variable
+      phase: after-response
+      selector:
+        expression: res.body.data.username
+        method: jsonq
+      variable:
+        name: filter_user_name
+        scope: runtime
   assertions:
     - expression: res.status
       operator: eq
@@ -48,6 +56,20 @@ runtime:
     - type: before-request
       code: |-
         bru.setVar("tc_user_005_username", "filter_test_" + bru.interpolate("{{$guid}}"));
+    - type: after-response
+      code: |-
+        if (res.getStatus() === 201 && res.getBody() && res.getBody().data) {
+          const baseUrl = bru.getEnvVar("base_url") || bru.getCollectionVar("base_url") || "http://localhost:8080";
+          const loginRes = await bru.sendRequest({
+            method: "POST",
+            url: `${baseUrl}/api/user/login`,
+            headers: { "Content-Type": "application/json", "Accept": "application/json" },
+            data: { username: res.getBody().data.username, password: "password123" }
+          });
+          if (loginRes && loginRes.data && loginRes.data.data) {
+            bru.setVar("filter_user_token", loginRes.data.data.token);
+          }
+        }
     - type: tests
       code: |-
         test("TC-USER-005 (Step 1): HTTP status is 201 Created", function() {
